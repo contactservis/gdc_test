@@ -5,6 +5,7 @@ use Bitrix\Main\Config\Option;
 use Bitrix\Main\EventManager;
 use Bitrix\Main\Application;
 use Bitrix\Main\IO\Directory;
+use Bitrix\Main\Diag\Debug;
 
 Loc::loadMessages(__FILE__);
 
@@ -66,31 +67,38 @@ class skiminok_test extends CModule{
         return true;
     }
 
+    public function InstallEvents(){
+
+        // регистрация обработчика событий обновления HL блоков
+        $eventManager = EventManager::getInstance(); 
+        $eventManager->registerEventHandler(
+            "",            
+            "OnAfterUpdate",
+            'Skiminok\Test\Main', 
+            "RecordChangeElement"
+        );
+        Debug::writeToFile("Регистрация обработчика событий изменения элементов"," ", "/upload/log.txt");
+      return false;
+    }
+
+
     public function InstallDB(){
+        // регистрация обработчика событий обновления HL блоков
+        $eventManager = \Bitrix\Main\EventManager::getInstance(); 
+        $eventManager->addEventHandler($this->MODULE_ID,"OnAfterUpdate", "function");
+        
         // создаем таблицу для фиксирования изменений элементов стправочника
         global $DB;
         $this->errors = false;
-        $this->errors = $DB->RunSQLBatch($_SERVER['DOCUMENT_ROOT'] . "/bitrix/modules/brainkit.d7/install/db/install.sql");
-        if (!$this->errors) {
- 
+        $this->errors = $DB->RunSQLBatch(dirname(__FILE__) . "/db/install.sql");
+        if ( !$this->errors ) { 
             return true;
-        } else
+        } else {
             return $this->errors;
+        }
         return false;
     }
 
-    public function InstallEvents(){
-
-        // EventManager::getInstance()->registerEventHandler(
-        //     "main",
-        //     "OnBeforeEndBufferContent",
-        //     $this->MODULE_ID,
-        //     "Falbar\ToTop\Main",
-        //     "appendScriptsToPage"
-        // );
-    
-        return true;
-    }
 
     public function DoUninstall(){
 
@@ -124,20 +132,22 @@ class skiminok_test extends CModule{
     }
 
     public function UnInstallDB(){
-
+        global $DB;
         Option::delete($this->MODULE_ID);
-     
+        if ( file_exists($f = dirname(__FILE__) . '/db/uninstall.sql') ) {
+            foreach($DB->ParseSQLBatch(file_get_contents($f)) as $sql)
+            $DB->Query($sql);
+        }
         return false;
     }
 
     public function UnInstallEvents(){
 
         EventManager::getInstance()->unRegisterEventHandler(
-            "main",
-                "OnBeforeEndBufferContent",
-                $this->MODULE_ID,
-                "Skiminok\Test\Main",
-                "appendScriptsToPage"
+            "",
+            "OnAfterUpdate",            
+            'Skiminok\Test\Main', 
+            "RecordChangeElement"
         );
       
         return false;
